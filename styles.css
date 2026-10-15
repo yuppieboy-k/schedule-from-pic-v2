@@ -56,6 +56,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   height: 100%;
   background-color: var(--bg-base);
@@ -1239,6 +1243,10 @@ textarea {
   justify-content: flex-end;
 }
 
+.settings-drawer[hidden] {
+  display: none !important;
+}
+
 .drawer-backdrop {
   position: absolute;
   inset: 0;
@@ -1409,6 +1417,11 @@ textarea {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.drawer-footer-actions {
+  margin-top: 8px;
+  margin-bottom: 16px;
 }
 
 /* ==================== TOAST ==================== */

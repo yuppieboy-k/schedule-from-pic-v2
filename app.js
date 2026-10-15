@@ -569,7 +569,9 @@ function openSettings() {
   if (testBadge) testBadge.hidden = true;
 
   drawer.hidden = false;
+  drawer.removeAttribute("hidden");
   drawer.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
 }
 
 function closeSettings() {
@@ -597,8 +599,11 @@ function closeSettings() {
   updateApiStatusIndicator();
 
   drawer.hidden = true;
+  drawer.setAttribute("hidden", "");
   drawer.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
 }
+
 
 async function testApiKeyConnection() {
   const inputKey = document.getElementById("input-gemini-key");
@@ -833,6 +838,20 @@ function bindEvents() {
 
   // Password toggle
   document.getElementById("btn-toggle-key-visibility")?.addEventListener("click", togglePasswordVisibility);
+
+  // Keyboard shortcut: Escape closes settings or camera modal
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const drawer = document.getElementById("settings-drawer");
+      if (drawer && !drawer.hidden) {
+        closeSettings();
+      }
+      const cameraDialog = document.getElementById("camera-dialog");
+      if (cameraDialog && cameraDialog.open) {
+        closeLiveCamera();
+      }
+    }
+  });
 
   // PWA Install Prompt
   const installBtn = document.getElementById("install-btn");
