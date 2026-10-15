@@ -1435,21 +1435,27 @@ textarea {
   border: 1px solid var(--border-medium);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
   padding: 12px 20px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #ffffff;
   z-index: 999;
   opacity: 0;
   transition: all 0.25s var(--ease-spring);
   pointer-events: none;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  max-width: min(92vw, 480px);
+  width: max-content;
+  text-align: center;
+  line-height: 1.45;
 }
 
 .toast.is-visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
 
 /* Responsive tweaks */
 @media (max-width: 420px) {

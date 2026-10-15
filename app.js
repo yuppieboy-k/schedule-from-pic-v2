@@ -23,7 +23,7 @@ const state = {
   cameraFacing: "environment",// "environment" (rear) or "user" (selfie)
   autoDeletePhoto: true,      // Automatically purge photo once calendar entry is created
   geminiApiKey: "",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-3.6-flash",
   deferredInstallPrompt: null,
 };
 
@@ -34,7 +34,14 @@ const LEGACY_KEY   = "schedule-from-pic:settings:v1";
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Migrate unsupported model names
+      if (!parsed.geminiModel || parsed.geminiModel === "gemini-2.5-flash" || parsed.geminiModel === "gemini-2.0-flash") {
+        parsed.geminiModel = "gemini-3.6-flash";
+      }
+      return parsed;
+    }
 
     // Check legacy v1 key migration
     const legacy = localStorage.getItem(LEGACY_KEY);
@@ -42,7 +49,7 @@ function loadSettings() {
       const parsed = JSON.parse(legacy);
       return {
         geminiApiKey: parsed.gemini || "",
-        geminiModel: "gemini-2.5-flash",
+        geminiModel: "gemini-3.6-flash",
         autoDeletePhoto: true,
       };
     }
@@ -51,7 +58,7 @@ function loadSettings() {
   }
   return {
     geminiApiKey: "",
-    geminiModel: "gemini-2.5-flash",
+    geminiModel: "gemini-3.6-flash",
     autoDeletePhoto: true,
   };
 }
@@ -67,7 +74,7 @@ function saveSettings(s) {
 function initSettings() {
   const s = loadSettings();
   state.geminiApiKey = s.geminiApiKey || "";
-  state.geminiModel = s.geminiModel || "gemini-2.5-flash";
+  state.geminiModel = s.geminiModel || "gemini-3.6-flash";
   state.autoDeletePhoto = s.autoDeletePhoto !== false;
 
   // Sync checkboxes
@@ -583,7 +590,7 @@ function closeSettings() {
   const toggleAutoDel = document.getElementById("toggle-auto-delete-settings");
 
   state.geminiApiKey = (inputKey?.value || "").trim();
-  state.geminiModel = selectModel?.value || "gemini-2.5-flash";
+  state.geminiModel = selectModel?.value || "gemini-3.6-flash";
   state.autoDeletePhoto = Boolean(toggleAutoDel?.checked);
 
   // Sync home screen toggle

@@ -1,6 +1,6 @@
 /* =========================================================
    Schedule from Pic — Gemini Vision Client
-   - extractWithGemini()  : Sends image to Gemini Vision API
+   - extractWithGemini()  : Sends image to Gemini Vision API with auto-fallback
    - testGeminiKey()      : Validates an API key against Google AI Studio
    - downscaleImage()     : Client-side downscaler to optimize upload speed
    ========================================================= */
@@ -8,11 +8,28 @@
 import { getPromptWithContext, validateAndNormalize } from "./prompt.js";
 
 export const GEMINI_MODELS = [
-  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", desc: "Recommended • Fastest & highest accuracy" },
-  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", desc: "High speed • Proven vision capabilities" },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", desc: "Next-gen ultra fast response" },
+  { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", desc: "Recommended • 15 RPM, 1,500 req/day free" },
+  { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", desc: "Latest Flash generation" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", desc: "Standard production model" },
   { id: "gemini-1.5-pro",   name: "Gemini 1.5 Pro",   desc: "Deep reasoning for dense/complex posters" },
 ];
+
+/**
+ * Clean up verbose Google API error messages into friendly, clear text.
+ */
+export function cleanGeminiErrorMessage(rawMsg, model = "") {
+  const msg = String(rawMsg || "");
+  if (msg.includes("not supported for generateContent") || msg.includes("not found for API version")) {
+    return `Model "${model || "selected"}" is not available for generateContent. Please choose Gemini 3.6 Flash or 1.5 Flash in Settings.`;
+  }
+  if (msg.includes("API key not valid") || msg.includes("API_KEY_INVALID")) {
+    return "Invalid Gemini API key. Please check your key in Settings.";
+  }
+  if (msg.includes("Quota exceeded") || msg.includes("ResourceExhausted") || msg.includes("RATE_LIMIT_EXCEEDED")) {
+    return "Gemini API rate limit reached. Please wait a minute and retry.";
+  }
+  return msg;
+}
 
 /**
  * Helper: read a File or Blob and downscale it via Canvas
@@ -79,8 +96,8 @@ export async function testGeminiKey(apiKey) {
     }
 
     const errJson = await res.json().catch(() => null);
-    const msg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-    return { ok: false, error: msg };
+    const rawMsg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+    return { ok: false, error: cleanGeminiErrorMessage(rawMsg) };
   } catch (err) {
     return { ok: false, error: err.message || "Network error while connecting to Gemini API" };
   }
@@ -88,16 +105,18 @@ export async function testGeminiKey(apiKey) {
 
 /**
  * Extract calendar event details using Google Gemini Vision.
+ * Automatically tries candidate fallback models if the chosen model
+ * is not supported or returns 404/400.
  *
  * @param {string} dataUrl - Base64 data URL of the image
  * @param {object} opts
  * @param {string} opts.apiKey - User's Gemini API key
- * @param {string} [opts.model="gemini-2.5-flash"] - Chosen model ID
+ * @param {string} [opts.model="gemini-3.6-flash"] - Chosen model ID
  * @param {function} [opts.onStatus] - Status update callback
  * @param {AbortSignal} [opts.signal] - Abort controller signal
  * @returns {Promise<{ event: object, modelUsed: string }>}
  */
-export async function extractWithGemini(dataUrl, { apiKey, model = "gemini-2.5-flash", onStatus, signal } = {}) {
+export async function extractWithGemini(dataUrl, { apiKey, model = "gemini-3.6-flash", onStatus, signal } = {}) {
   const key = String(apiKey || "").trim();
   if (!key) {
     throw new Error("Missing Gemini API key. Please open Settings and enter your free API key.");
@@ -129,50 +148,70 @@ export async function extractWithGemini(dataUrl, { apiKey, model = "gemini-2.5-f
     },
   };
 
-  const selectedModel = model || "gemini-2.5-flash";
-  onStatus?.(`Sending photo to Gemini (${selectedModel})…`);
+  // Build list of models to try in order: chosen model -> gemini-3.6-flash -> gemini-3.8-flash -> gemini-1.5-flash
+  const preferred = (model || "").trim() || "gemini-3.6-flash";
+  const candidates = [preferred, "gemini-3.6-flash", "gemini-3.8-flash", "gemini-1.5-flash"];
+  const modelsToTry = candidates.filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent?key=${encodeURIComponent(key)}`;
+  let lastError = null;
 
-  let res;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch (err) {
-    if (err.name === "AbortError") throw err;
-    throw new Error(`Failed to contact Gemini API: ${err.message}. Check your internet connection.`);
-  }
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const currentModel = modelsToTry[i];
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-  if (!res.ok) {
-    // If the chosen model is 404, attempt fallback to gemini-1.5-flash if different
-    if (res.status === 404 && selectedModel !== "gemini-1.5-flash") {
-      onStatus?.("Model unavailable, trying Gemini 1.5 Flash fallback…");
-      return extractWithGemini(dataUrl, { apiKey, model: "gemini-1.5-flash", onStatus, signal });
+    onStatus?.(`Contacting Gemini (${currentModel})…`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent?key=${encodeURIComponent(key)}`;
+
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (err) {
+      if (err.name === "AbortError") throw err;
+      throw new Error(`Failed to contact Gemini API: ${err.message}. Check your internet connection.`);
     }
 
-    const errJson = await res.json().catch(() => null);
-    const errMsg = errJson?.error?.message || `Gemini API returned error ${res.status}`;
-    throw new Error(errMsg);
-  }
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      const rawMsg = errJson?.error?.message || `Gemini API returned error ${res.status}`;
+      const lower = rawMsg.toLowerCase();
 
-  onStatus?.("Analyzing extracted event details…");
-  const json = await res.json();
-  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      // Check if this error indicates an invalid or unsupported model
+      const isModelIssue =
+        res.status === 404 ||
+        lower.includes("not supported for generatecontent") ||
+        lower.includes("not found for api version") ||
+        lower.includes("is not found");
 
-  if (!text) {
-    const finishReason = json?.candidates?.[0]?.finishReason;
-    if (finishReason === "SAFETY") {
-      throw new Error("Gemini blocked the image response due to safety filters.");
+      if (isModelIssue && i < modelsToTry.length - 1) {
+        console.warn(`Model "${currentModel}" failed: ${rawMsg}. Auto-trying fallback model...`);
+        onStatus?.(`Model ${currentModel} not available, trying ${modelsToTry[i + 1]}…`);
+        lastError = new Error(cleanGeminiErrorMessage(rawMsg, currentModel));
+        continue; // Try next candidate model
+      }
+
+      throw new Error(cleanGeminiErrorMessage(rawMsg, currentModel));
     }
-    throw new Error("Gemini completed processing but returned no text content.");
+
+    onStatus?.("Analyzing extracted event details…");
+    const json = await res.json();
+    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      const finishReason = json?.candidates?.[0]?.finishReason;
+      if (finishReason === "SAFETY") {
+        throw new Error("Gemini blocked the image response due to content safety filters.");
+      }
+      throw new Error("Gemini completed processing but returned no text content.");
+    }
+
+    const event = validateAndNormalize(text);
+    return { event, modelUsed: currentModel };
   }
 
-  const event = validateAndNormalize(text);
-  return { event, modelUsed: selectedModel };
+  throw lastError || new Error("Failed to extract details from photo with available Gemini models.");
 }

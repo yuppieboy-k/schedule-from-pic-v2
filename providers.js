@@ -12,7 +12,7 @@ export { downscaleImage, splitDataUrl, testGeminiKey, extractWithGemini, GEMINI_
 export const gemini = {
   name: "Google Gemini",
   needs: { apiKey: true },
-  async extract(dataUrl, { apiKey, model = "gemini-2.5-flash", onStatus, signal }) {
+  async extract(dataUrl, { apiKey, model = "gemini-3.6-flash", onStatus, signal }) {
     const res = await extractWithGemini(dataUrl, { apiKey, model, onStatus, signal });
     return res.event;
   },
@@ -31,7 +31,7 @@ export async function extractWithFailover(providerName, dataUrl, keys, opts = {}
   opts.onProviderTry?.("Google Gemini");
   const result = await extractWithGemini(dataUrl, {
     apiKey,
-    model: opts.model || "gemini-2.5-flash",
+    model: opts.model || "gemini-3.6-flash",
     onStatus: opts.onStatus,
     signal: opts.signal,
   });
