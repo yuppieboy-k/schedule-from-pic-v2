@@ -1,0 +1,19 @@
+{
+  "name": "Schedule from Pic — AI Calendar from Photo",
+  "short_name": "Schedule",
+  "description": "Extract calendar events from photos of flyers, invitations, or screenshots using Google Gemini AI.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090a10",
+  "theme_color": "#090a10",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
