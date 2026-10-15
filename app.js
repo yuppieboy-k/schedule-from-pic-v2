@@ -22,6 +22,8 @@ const state = {
   liveStream: null,           // MediaStream for live camera
   cameraFacing: "environment",// "environment" (rear) or "user" (selfie)
   autoDeletePhoto: true,      // Automatically purge photo once calendar entry is created
+  fileHandle: null,           // FileSystemFileHandle for physical disk deletion
+  photoSource: null,          // "camera-live" | "camera-system" | "disk-file" | "gallery-picker" | "clipboard"
   geminiApiKey: "",
   geminiModel: "gemini-3.6-flash",
   deferredInstallPrompt: null,
@@ -143,7 +145,7 @@ function showToast(message, durationMs = 2600) {
 }
 
 /* ---------- Photo Handling (Take & Select) ---------- */
-async function handleFileChosen(fileOrBlob) {
+async function handleFileChosen(fileOrBlob, meta = {}) {
   if (!fileOrBlob) return;
   if (!fileOrBlob.type.startsWith("image/")) {
     showToast("Please select a valid image file");
@@ -151,6 +153,7 @@ async function handleFileChosen(fileOrBlob) {
   }
 
   state.imageFile = fileOrBlob;
+  state.photoSource = meta.source || (state.fileHandle ? "disk-file" : "gallery-picker");
 
   // Revoke previous preview object URL to prevent memory accumulation
   if (state.previewUrl) {
@@ -173,9 +176,68 @@ async function handleFileChosen(fileOrBlob) {
   const autoDeleteBadge = document.getElementById("preview-auto-delete-badge");
   if (autoDeleteBadge) {
     autoDeleteBadge.hidden = !state.autoDeletePhoto;
+    const badgeText = autoDeleteBadge.querySelector("span");
+    if (badgeText) {
+      if (state.photoSource === "camera-live") {
+        badgeText.textContent = "Live camera: Never saved to photo gallery";
+      } else if (state.photoSource === "disk-file") {
+        badgeText.textContent = "Original file will be deleted from disk";
+      } else {
+        badgeText.textContent = "Auto-delete active (memory wiped on export)";
+      }
+    }
   }
 
   showScreen("preview");
+}
+
+/**
+ * Primary "Take Photo" flow:
+ * Uses in-app live camera viewfinder (getUserMedia) so photo is captured
+ * directly into memory canvas and NEVER written to the phone's photo gallery!
+ */
+async function takePhotoAction() {
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    await openLiveCamera();
+  } else {
+    // Fallback if browser/platform lacks getUserMedia
+    document.getElementById("file-camera")?.click();
+  }
+}
+
+/**
+ * Primary "Select Photo" flow:
+ * On desktop Chromium (Chrome/Edge), uses File System Access API to get a
+ * FileSystemFileHandle, enabling physical deletion of original file from disk.
+ * On mobile/other browsers, falls back to native gallery input.
+ */
+async function choosePhotoAction() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [
+          {
+            description: "Images",
+            accept: {
+              "image/*": [".png", ".jpg", ".jpeg", ".webp", ".heic", ".gif"],
+            },
+          },
+        ],
+        multiple: false,
+      });
+      if (handle) {
+        state.fileHandle = handle;
+        const file = await handle.getFile();
+        await handleFileChosen(file, { source: "disk-file" });
+        return;
+      }
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      console.warn("showOpenFilePicker error, falling back:", err);
+    }
+  }
+  // Standard fallback
+  document.getElementById("file-library")?.click();
 }
 
 /* ---------- Live Camera Viewfinder Modal ---------- */
@@ -185,7 +247,8 @@ async function openLiveCamera() {
   if (!dialog || !video) return;
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showToast("Live camera not supported by this browser. Using native camera.");
+    showToast("Opening native camera… (Note: native camera saves to gallery)");
+    state.fileHandle = null;
     document.getElementById("file-camera")?.click();
     return;
   }
@@ -206,7 +269,8 @@ async function openLiveCamera() {
     dialog.showModal();
   } catch (err) {
     console.warn("Camera stream failed:", err);
-    showToast("Camera access was not granted. Opening file camera instead.");
+    showToast("Opening system camera… (Note: system camera saves to gallery)");
+    state.fileHandle = null;
     document.getElementById("file-camera")?.click();
   }
 }
@@ -242,7 +306,8 @@ async function snapLivePhoto() {
 
   canvas.toBlob((blob) => {
     if (blob) {
-      handleFileChosen(blob);
+      state.fileHandle = null;
+      handleFileChosen(blob, { source: "camera-live" });
     }
   }, "image/jpeg", 0.92);
 }
@@ -445,13 +510,28 @@ function fromLocalInputString(val) {
  * - "Outlook Calendar"
  * - "Download .ics"
  *
- * If `state.autoDeletePhoto` is enabled, this function completely deletes
- * the photo from memory, canvas, object URLs, and preview buffers.
+ * If `state.autoDeletePhoto` is enabled:
+ * 1. If chosen from disk via File System Access API (Desktop Chrome/Edge): deletes the original file from disk.
+ * 2. If snapped via in-app camera: the photo was only ever in memory and never written to gallery.
+ * 3. Wipes all memory, canvas, object URLs, and preview buffers.
  */
-function handlePostCalendarCreation() {
+async function handlePostCalendarCreation() {
   if (!state.autoDeletePhoto) return;
 
-  // Wipe image state and revoke Object URL
+  let deletedFromDisk = false;
+
+  // 1. If FileSystemFileHandle is available (Chrome/Edge on desktop), physically delete original file from disk
+  if (state.fileHandle && typeof state.fileHandle.remove === "function") {
+    try {
+      await state.fileHandle.remove();
+      deletedFromDisk = true;
+      state.fileHandle = null;
+    } catch (err) {
+      console.warn("Could not delete file from disk:", err);
+    }
+  }
+
+  // 2. Wipe image state and revoke Object URL
   if (state.previewUrl) {
     URL.revokeObjectURL(state.previewUrl);
     state.previewUrl = null;
@@ -477,11 +557,24 @@ function handlePostCalendarCreation() {
   const statusText = document.getElementById("auto-delete-status-text");
   if (statusBar && statusText) {
     statusBar.classList.add("purged");
-    statusText.textContent = "✓ Photo automatically deleted from app memory & cache";
+    if (deletedFromDisk) {
+      statusText.textContent = "✓ Original photo file deleted from disk & memory cleared";
+    } else if (state.photoSource === "camera-live") {
+      statusText.textContent = "✓ In-app camera photo wiped (never saved to photo gallery)";
+    } else {
+      statusText.textContent = "✓ Photo cleared from memory (delete from Photos app if needed)";
+    }
   }
 
-  showToast("🗑️ Photo auto-deleted from app memory");
+  if (deletedFromDisk) {
+    showToast("🗑️ Original photo deleted from your computer!", 3500);
+  } else if (state.photoSource === "camera-live") {
+    showToast("🗑️ Photo cleared! (Never saved to photo gallery)", 3500);
+  } else {
+    showToast("🗑️ Memory cleared! (Delete original from Photos app if needed)", 4500);
+  }
 }
+
 
 async function saveToDefaultCalendar() {
   const event = readReviewForm();
@@ -540,6 +633,8 @@ function startOver() {
   }
   state.imageFile = null;
   state.imageDataUrl = null;
+  state.fileHandle = null;
+  state.photoSource = null;
   state.event = null;
 
   const previewImg = document.getElementById("preview-image");
@@ -552,7 +647,7 @@ function startOver() {
   const statusText = document.getElementById("auto-delete-status-text");
   if (statusBar && statusText) {
     statusBar.classList.remove("purged");
-    statusText.textContent = "Photo will be automatically deleted from memory upon opening calendar";
+    statusText.textContent = "Photo will be automatically deleted upon opening calendar";
   }
 
   showScreen("home");
@@ -691,19 +786,22 @@ function bindEvents() {
   const fileLibrary = document.getElementById("file-library");
 
   fileCamera?.addEventListener("change", (e) => {
-    handleFileChosen(e.target.files?.[0]);
+    state.fileHandle = null;
+    handleFileChosen(e.target.files?.[0], { source: "camera-system" });
     e.target.value = "";
   });
 
   fileLibrary?.addEventListener("change", (e) => {
-    handleFileChosen(e.target.files?.[0]);
+    if (!state.fileHandle) {
+      handleFileChosen(e.target.files?.[0], { source: "gallery-picker" });
+    }
     e.target.value = "";
   });
 
   // Drag & Drop
   const dropzone = document.getElementById("dropzone");
   if (dropzone) {
-    dropzone.addEventListener("click", () => fileLibrary?.click());
+    dropzone.addEventListener("click", () => choosePhotoAction());
     dropzone.addEventListener("dragover", (e) => {
       e.preventDefault();
       dropzone.classList.add("is-dragover");
@@ -715,7 +813,10 @@ function bindEvents() {
       e.preventDefault();
       dropzone.classList.remove("is-dragover");
       const file = e.dataTransfer?.files?.[0];
-      if (file) handleFileChosen(file);
+      if (file) {
+        state.fileHandle = null;
+        handleFileChosen(file, { source: "drop" });
+      }
     });
   }
 
@@ -727,7 +828,8 @@ function bindEvents() {
       if (item.type.startsWith("image/")) {
         const file = item.getAsFile();
         if (file) {
-          handleFileChosen(file);
+          state.fileHandle = null;
+          handleFileChosen(file, { source: "clipboard" });
           showToast("Image pasted from clipboard");
           break;
         }
@@ -786,10 +888,10 @@ function bindEvents() {
 
     switch (action) {
       case "take-photo":
-        fileCamera?.click();
+        takePhotoAction();
         break;
       case "choose-photo":
-        fileLibrary?.click();
+        choosePhotoAction();
         break;
       case "open-live-camera":
         openLiveCamera();

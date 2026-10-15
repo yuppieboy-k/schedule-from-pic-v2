@@ -98,7 +98,7 @@
 
         <!-- Primary Action Cards: Take Photo vs Select Photo -->
         <div class="action-grid">
-          <!-- Take Photo Button -->
+          <!-- Take Photo Button (In-app live camera) -->
           <button class="action-card primary" type="button" data-action="take-photo" id="btn-take-photo">
             <div class="action-card-glow"></div>
             <div class="action-icon-wrap">
@@ -109,7 +109,7 @@
             </div>
             <div class="action-details">
               <h3 class="action-title">Take Photo</h3>
-              <p class="action-subtitle">Snap flyer with camera</p>
+              <p class="action-subtitle">Live camera • Zero gallery clutter</p>
             </div>
             <div class="action-arrow">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -129,7 +129,7 @@
             </div>
             <div class="action-details">
               <h3 class="action-title">Select Photo</h3>
-              <p class="action-subtitle">From library or files</p>
+              <p class="action-subtitle">Disk deletion or photo gallery</p>
             </div>
             <div class="action-arrow">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -165,24 +165,64 @@
         <input id="file-library" type="file" accept="image/*" hidden />
 
         <!-- AUTO-DELETE PHOTO TOGGLE CARD (Key Requirement) -->
-        <div class="privacy-card">
-          <div class="privacy-info">
-            <div class="privacy-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                <line x1="10" y1="11" x2="10" y2="17"/>
-                <line x1="14" y1="11" x2="14" y2="17"/>
-              </svg>
+        <div class="privacy-card-container">
+          <div class="privacy-card">
+            <div class="privacy-info">
+              <div class="privacy-icon">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </div>
+              <div class="privacy-text">
+                <span class="privacy-title">Auto-delete photo on calendar creation</span>
+                <span class="privacy-desc">Deletes original file on disk & snaps camera in-memory</span>
+              </div>
             </div>
-            <div class="privacy-text">
-              <span class="privacy-title">Auto-delete photo on calendar creation</span>
-              <span class="privacy-desc">Wipes photo from memory & app cache once calendar entry is created</span>
-            </div>
+            <label class="switch" for="toggle-auto-delete-home">
+              <input type="checkbox" id="toggle-auto-delete-home" checked />
+              <span class="slider"></span>
+            </label>
           </div>
-          <label class="switch" for="toggle-auto-delete-home">
-            <input type="checkbox" id="toggle-auto-delete-home" checked />
-            <span class="slider"></span>
-          </label>
+
+          <!-- Detailed Gallery & Disk Deletion Explanation -->
+          <details class="gallery-deletion-explainer">
+            <summary class="explainer-summary">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>How photo deletion works with your device's Photo Gallery</span>
+              <svg class="chevron-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </summary>
+            <div class="explainer-content">
+              <div class="explainer-item">
+                <span class="item-icon">📸</span>
+                <div>
+                  <strong>Live Camera (Zero Gallery Clutter):</strong>
+                  <p>When using <em>Take Photo</em>, the photo is captured directly into browser memory. It is <strong>never saved to your device's photo gallery</strong> in the first place, leaving your gallery 100% clean.</p>
+                </div>
+              </div>
+              <div class="explainer-item">
+                <span class="item-icon">💻</span>
+                <div>
+                  <strong>Desktop Files (Physical Disk Deletion):</strong>
+                  <p>On Chrome/Edge desktop, selecting a photo via the File System Access API allows the app to <strong>physically delete the original file from your disk</strong> once exported.</p>
+                </div>
+              </div>
+              <div class="explainer-item">
+                <span class="item-icon">📱</span>
+                <div>
+                  <strong>Mobile Gallery (Browser Sandbox Security):</strong>
+                  <p>Apple iOS and Android security sandboxes intentionally forbid all web browsers from modifying or deleting existing photos in Apple Photos or Google Photos. (Direct gallery deletion on mobile requires a native app wrapper like Capacitor).</p>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
 
         <!-- Privacy & client-side footer assurance -->
@@ -519,20 +559,29 @@
             <div class="settings-card-header">
               <div class="settings-card-icon">🛡️</div>
               <div>
-                <h3 class="settings-card-title">Photo Privacy & Deletion</h3>
-                <p class="settings-card-subtitle">Control in-app photo caching</p>
+                <h3 class="settings-card-title">Photo Privacy & Gallery Deletion</h3>
+                <p class="settings-card-subtitle">Zero-clutter photo lifecycle</p>
               </div>
             </div>
 
             <div class="setting-toggle-row">
               <div class="toggle-text">
                 <label for="toggle-auto-delete-settings" class="toggle-title">Auto-delete photo on export</label>
-                <span class="toggle-desc">Purges photo from device memory, canvas buffers, and preview cache immediately upon calendar creation.</span>
+                <span class="toggle-desc">Deletes original files on disk & purges camera memory immediately upon calendar creation.</span>
               </div>
               <label class="switch" for="toggle-auto-delete-settings">
                 <input type="checkbox" id="toggle-auto-delete-settings" checked />
                 <span class="slider"></span>
               </label>
+            </div>
+
+            <div class="settings-explainer-box">
+              <div class="settings-explainer-title">How Gallery Deletion Works:</div>
+              <ul class="settings-explainer-list">
+                <li><strong>📸 Live Camera:</strong> Captured directly into memory — never saved to Apple Photos / Google Photos.</li>
+                <li><strong>💻 Desktop:</strong> Deletes the original file from your computer's drive via the File System Access API.</li>
+                <li><strong>📱 Phone Gallery:</strong> Web browsers cannot delete from iOS/Android Photos app due to OS security sandboxing. Use Live Camera to avoid gallery clutter!</li>
+              </ul>
             </div>
           </section>
 

@@ -3,7 +3,7 @@
    Cache-first strategy for app shell assets.
    ========================================================= */
 
-const CACHE_VERSION = 'schedule-v9';
+const CACHE_VERSION = 'schedule-v10';
 const ASSETS = [
   './',
   './index.html',

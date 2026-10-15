@@ -493,6 +493,10 @@ a:hover {
 }
 
 /* Privacy Toggle Card (Key Feature) */
+.privacy-card-container {
+  margin-bottom: 24px;
+}
+
 .privacy-card {
   display: flex;
   align-items: center;
@@ -503,7 +507,80 @@ a:hover {
   background: var(--surface-card);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-subtle);
-  margin-bottom: 24px;
+  margin-bottom: 8px;
+}
+
+.gallery-deletion-explainer {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
+}
+
+.gallery-deletion-explainer[open] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-medium);
+}
+
+.explainer-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.explainer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.explainer-summary .chevron-icon {
+  margin-left: auto;
+  transition: transform var(--transition-fast);
+}
+
+.gallery-deletion-explainer[open] .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.explainer-content {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.explainer-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.4;
+}
+
+.explainer-item .item-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.explainer-item strong {
+  color: var(--text-main);
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 2px;
+}
+
+.explainer-item p {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  margin: 0;
 }
 
 .privacy-info {
@@ -1417,6 +1494,34 @@ textarea {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.settings-explainer-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.settings-explainer-title {
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.settings-explainer-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.settings-explainer-list strong {
+  color: var(--text-main);
 }
 
 .drawer-footer-actions {
